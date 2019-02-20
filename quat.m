@@ -4,31 +4,31 @@ classdef quat < handle
   end
 
   methods
-    function obj = quat(w, x, y, z)
+    function q = quat(w, x, y, z)
       switch nargin
       case 0
-        obj.q = [1 0 0 0]';
+        q.q = [1 0 0 0]';
       case 1
         if strcmp(class(w), 'quat')
-          obj.q = w.q;
+          q.q = w.q;
         elseif all(size(w) == [1 1])
-          obj.q(1) = w;
+          q.q(1) = w;
         elseif all(size(w) == [4 1])
-          obj.q = w;
+          q.q = w;
         elseif all(size(w) == [1 4])
-          obj.q = w';
+          q.q = w';
         elseif all(size(w) == [3 3])
-          obj = quat.from_rotm(w);
+          q = quat.from_rotm(w);
         else
-          obj.q = [1 0 0 0]';
+          q.q = [1 0 0 0]';
         end
       case 4
-        obj.q = [w x y z]';
+        q.q = [w x y z]';
       end
     end
 
-    function disp(obj)
-      fprintf(1, '    %d + %d i + %d j + %d k\n\n', obj.q);
+    function disp(q)
+      fprintf(1, '    %d + %d i + %d j + %d k\n\n', q.q);
     end
 
     function [q] = plus(a, b)
@@ -87,14 +87,15 @@ classdef quat < handle
       q.q = q.q / norm(q);
     end
 
-    function [m] = to_rotm(obj)
+    function [m] = to_rotm(q)
+      w = q.q(1); x = q.q(2); y=q.q(3); z=q.q(4);
       m = eye(3) + ...
-          2 * [-obj.q(3)^2 - obj.q(4)^2,        obj.q(2)*obj.q(3),        obj.q(2)*obj.q(4);
-                      obj.q(2)*obj.q(3), -obj.q(2)^2 - obj.q(4)^2,        obj.q(3)*obj.q(4);
-                      obj.q(2)*obj.q(4),        obj.q(3)*obj.q(4), -obj.q(2)^2 - obj.q(3)^2] + ...
-          2 * obj.q(1) * [        0, -obj.q(4),  obj.q(3);
-                           obj.q(4),         0, -obj.q(2);
-                          -obj.q(3),  obj.q(2),         0];
+          2 * [-y^2-z^2,      x*y,      x*z;
+                    x*y, -x^2-z^2,      y*z;
+                    x*z,      y*z, -x^2-y^2] + ...
+          2 * w * [   0, -z,  y;
+                      z,  0, -x;
+                     -y,  x,  0];
     end
   end
 
@@ -158,13 +159,15 @@ classdef quat < handle
              0.9313666, -0.3149935, -0.1825799;
              0.3639001,  0.7894999,  0.4942333];
       q = quat(m);
-      assert(sum(abs(q.q - [0.5403023, 0.4497852, 0.2248926, 0.6746777]')) < 1e-6);
+      a = [0.5403023; 0.4497852; 0.2248926; 0.6746777];
+      assert(sum(abs(q.q - a)) < 1e-6);
       q = quat.from_rotm(m);
-      assert(sum(abs(q.q - [0.5403023, 0.4497852, 0.2248926, 0.6746777]')) < 1e-6);
+      assert(sum(abs(q.q - a)) < 1e-6);
       q = quat.from_ypr(.02, 0, 0);
       assert(sum(abs(q.q - [0.99995, 0, 0, 0.0099998]')) < 1e-6);
       q = quat.from_ypr(.2, .4, .6);
-      assert(sum(abs(q.q - [0.9374771, 0.2692345, 0.2177626, 0.0350559]')) < 1e-6);
+      a =[0.9374771; 0.2692345; 0.2177626; 0.0350559];
+      assert(sum(abs(q.q - a)) < 1e-6);
 
       % test operators
       q1 = quat([1 2 3 4]);
