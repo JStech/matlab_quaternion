@@ -27,6 +27,22 @@ classdef quat < handle
       end
     end
 
+    function w = w(q)
+      w = q.q(1);
+    end
+
+    function x = x(q)
+      x = q.q(2);
+    end
+
+    function y = y(q)
+      y = q.q(3);
+    end
+
+    function z = z(q)
+      z = q.q(4);
+    end
+
     function disp(q)
       fprintf(1, '    %d + %d i + %d j + %d k\n\n', q.q);
     end
@@ -52,22 +68,45 @@ classdef quat < handle
                 qa(1)*qb(4) + qb(1)*qa(4) + qa(2)*qb(3) - qa(3)*qb(2)]);
     end
 
-    function [q] = log(a)
+    function [d] = dot(a, b)
+      d = sum(a.q .* b.q);
+    end
+
+    function [q] = log_(a)
+      if abs(a.norm() - 1) > 1e-6
+        warning('Taking log of non-unit quaternion')
+      end
       theta = asin(norm(a.q(2:4)));
-      q = quat([0; theta*a.q(2:4)]);
+      v = a.q(2:4)/sin(theta);
+      q = quat([0; theta*v]);
     end
 
-    function [q] = exp(a)
+    function [q] = exp_(a)
+      if a.q(1) ~= 0
+        warning('Taking exp of quaternion with non-zero real part')
+      end
       theta = norm(a.q(2:4));
-      q = quat([cos(theta); sin(theta)/theta * a.q(2:4)]);
+      v = a.q(2:4)/theta;
+      q = quat([cos(theta); sin(theta)*v]);
     end
 
-    function [q] = mpower(a, b)
-      q = quat();
+    function [q] = mpower(a, t)
+      assert(strcmp(class(a), 'quat'))
+      assert(strcmp(class(t), 'double'))
+      assert(all(size(t) == [1 1]))
+      q = t*a.log_();
+      q = q.exp_();
     end
 
     function [e] = eq(a, b)
       e = all(a.q == b.q);
+    end
+
+    function [e] = approxeq(a, b, epsilon)
+      if nargin < 3
+        epsilon = 1e-6;
+      end
+      e = (norm(a-b) < epsilon);
     end
 
     function [q] = ctranspose(a)
@@ -147,6 +186,36 @@ classdef quat < handle
              sy*cp*cr - cy*sp*sr];
     end
 
+    function q = log(a)
+      q = quat(a.log_());
+    end
+
+    function q = exp(a)
+      q = quat(a.exp_());
+    end
+
+    %%% INTERPOLATION %%%
+    function q = lerp(q0, q1, h)
+      assert(0<=h && h<=1)
+      assert(abs(q0.norm() - 1) < 1e-6)
+      assert(abs(q1.norm() - 1) < 1e-6)
+      q = (1-h)*q0 + h*q1;
+      q.normalize();
+    end
+
+    function q = slerp(q0, q1, h)
+      q = q0*(q0'*q1)^h;
+    end
+
+    function q = squad(q0, q1, s0, s1, h)
+      q = quat.slerp(quat.slerp(q0, q1, h), quat.slerp(s0, s1, h), 2*h*(1-h));
+    end
+
+    function s1 = calc_s1(q0, q1, q2)
+      s1 = q1 * quat.exp(-1/4 * (quat.log(q1'*q2) + quat.log(q1'*q0)));
+    end
+
+    %%% TESTS %%%
     function test()
       % test constructors
       q = quat(); assert(all(q.q == [1; 0; 0; 0]))
@@ -194,6 +263,22 @@ classdef quat < handle
       assert(q1.normalized() == quat(1/sqrt(30) * [1 2 3 4]))
       q1.normalize();
       assert(q1 == quat(1/sqrt(30) * [1 2 3 4]))
+
+      % log, exp, power
+      assert(q1.log_().approxeq(quat([0 0.5152 0.7728 1.0304]), 1e-4))
+      assert(q1.log_().exp_().approxeq(q1))
+      v = [1; 2; 3];
+      v = v/norm(v);
+      theta = pi/3;
+      q1 = quat([0; theta*v]);
+      assert(q1.exp_().norm() == 1)
+      assert(q1.exp_().log().approxeq(q1))
+      assert(abs(q1.exp_().w() - 0.5) < 1e-6)
+
+      q = quat([4 3 2 1]);
+      q.normalize();
+
+      % TODO: interpolation
     end
 
   end
